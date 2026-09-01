@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 export const dynamic = "force-dynamic";
 
 /** Public store URLs for the Barada mobile app. */
-export const STORE_URLS: Record<string, string> = {
+const STORE_URLS: Record<string, string> = {
   google: "https://play.google.com/store/apps/details?id=ai.barada.app&hl=de",
   apple: "https://apps.apple.com/de/app/barada-ai/id6759335541",
 };
