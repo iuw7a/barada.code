@@ -1,0 +1,34 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { prisma } from "@/lib/prisma";
+import { verifyPassword } from "@/lib/auth/password";
+import { createSession } from "@/lib/auth/session";
+import { apiErrorResponse, ApiError } from "@/lib/auth/guard";
+import { rateLimit } from "@/lib/rateLimit";
+
+const Body = z.object({
+  email: z.string().email().max(200),
+  password: z.string().min(1).max(200),
+});
+
+export async function POST(req: Request) {
+  try {
+    const ip = req.headers.get("x-forwarded-for") ?? "local";
+    const rl = rateLimit(`signin:${ip}`, 10, 60_000);
+    if (!rl.ok) throw new ApiError(429, `太多请求，请 ${rl.retryAfterSec}s 后重试`);
+
+    const parsed = Body.safeParse(await req.json().catch(() => null));
+    if (!parsed.success) throw new ApiError(400, "输入无效");
+    const { email, password } = parsed.data;
+
+    const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
+    if (!user || !verifyPassword(password, user.passwordHash)) {
+      throw new ApiError(401, "邮箱或密码错误");
+    }
+
+    await createSession(user.id);
+    return NextResponse.json({ user: { id: user.id, email: user.email, name: user.name } });
+  } catch (err) {
+    return apiErrorResponse(err);
+  }
+}

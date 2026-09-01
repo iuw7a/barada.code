@@ -1,0 +1,83 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+.dark {
+  color-scheme: dark;
+}
+
+@layer base {
+  * {
+    @apply border-ink-200 dark:border-ink-800;
+  }
+  html {
+    @apply scroll-smooth;
+  }
+  body {
+    @apply font-sans;
+  }
+  :focus-visible {
+    @apply outline-none ring-2 ring-accent-500 ring-offset-2 ring-offset-ink-50 dark:ring-offset-ink-950;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-accent-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-700 disabled:opacity-50;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-ink-600 transition-colors hover:bg-ink-100 hover:text-ink-900 dark:text-ink-300 dark:hover:bg-ink-800 dark:hover:text-ink-100;
+  }
+  .input {
+    @apply w-full rounded-lg border border-ink-300 bg-white px-3 py-2 text-sm text-ink-900 placeholder:text-ink-400 focus:border-accent-500 dark:border-ink-700 dark:bg-ink-900 dark:text-ink-100;
+  }
+  .card {
+    @apply rounded-xl border border-ink-200 bg-white shadow-sm dark:border-ink-800 dark:bg-ink-900;
+  }
+  .glass {
+    @apply border border-white/10 bg-white/70 backdrop-blur-md dark:bg-ink-900/70;
+  }
+}
+
+/* Barada logo "thinking" animation — soft rotate + breathe, not a spinner */
+@keyframes logo-think {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(180deg) scale(1.08);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}
+.logo-think {
+  animation: logo-think 2.2s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  will-change: transform;
+}
+
+/* Gentle float for landing / empty-state logo */
+@keyframes logo-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+.logo-float {
+  animation: logo-float 4s ease-in-out infinite;
+}
+
+/* Thin scrollbars for editor/preview panes */
+.thin-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.thin-scroll::-webkit-scrollbar-thumb {
+  @apply rounded-full bg-ink-300 dark:bg-ink-700;
+}
