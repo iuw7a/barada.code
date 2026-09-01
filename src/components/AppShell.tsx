@@ -67,7 +67,7 @@ export default function AppShell({
     workspaces[0];
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-dvh overflow-hidden">
       {/* Mobile backdrop */}
       {mobileOpen && (
         <div className="fixed inset-0 z-30 bg-black/40 md:hidden" onClick={() => setMobileOpen(false)} />
@@ -257,10 +257,10 @@ export default function AppShell({
       </aside>
 
       {/* Main */}
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="relative flex min-w-0 flex-1 flex-col">
         <button
           onClick={() => setMobileOpen(true)}
-          className="btn-ghost absolute end-4 top-3 z-20 md:hidden"
+          className="btn-ghost absolute end-2 top-2 z-20 h-11 w-11 justify-center p-0 md:hidden"
           aria-label="Open menu"
         >
           <PanelLeftOpen className="h-5 w-5" />

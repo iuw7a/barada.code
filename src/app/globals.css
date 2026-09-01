@@ -42,6 +42,31 @@
   }
 }
 
+/* ── Mobile / touch hardening ────────────────────────────────────────────
+   1. iOS auto-zooms into any input with font-size < 16px — that "zoom jump"
+      is the main reason mobile layout feels broken. Force 16px on touch.
+   2. Minimum 44px hit targets for buttons and nav links on touch devices.
+   3. Kill the gray tap flash and rubber-band overscroll artifacts. */
+@media (pointer: coarse) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+  .btn-primary,
+  .btn-ghost {
+    min-height: 44px;
+  }
+  nav a,
+  nav button {
+    min-height: 44px;
+  }
+}
+html {
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
 /* Barada logo "thinking" animation — soft rotate + breathe, not a spinner */
 @keyframes logo-think {
   0% {
@@ -84,8 +109,8 @@
 
 /* ── Admin Control Center — fintech glass design system ── */
 .glass-card {
-  border-radius: 1rem;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.045) 0%, rgba(255, 255, 255, 0.015) 100%);
   backdrop-filter: blur(12px);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.04);

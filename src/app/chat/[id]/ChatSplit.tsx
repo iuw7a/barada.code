@@ -71,7 +71,7 @@ export default function ChatSplit({
       <div className="fixed bottom-24 end-4 z-40 flex gap-1 rounded-full border border-ink-200 bg-white p-1 shadow-lg lg:hidden dark:border-ink-700 dark:bg-ink-900">
         <button
           onClick={() => setMobileTab("chat")}
-          className={`flex items-center gap-1 rounded-full px-3 py-1.5 text-xs ${
+          className={`flex min-h-11 items-center gap-1.5 rounded-full px-4 text-sm ${
             mobileTab === "chat" ? "bg-accent-600 text-white" : "text-ink-500 dark:text-ink-300"
           }`}
         >
@@ -79,7 +79,7 @@ export default function ChatSplit({
         </button>
         <button
           onClick={() => setMobileTab("project")}
-          className={`flex items-center gap-1 rounded-full px-3 py-1.5 text-xs ${
+          className={`flex min-h-11 items-center gap-1.5 rounded-full px-4 text-sm ${
             mobileTab === "project" ? "bg-accent-600 text-white" : "text-ink-500 dark:text-ink-300"
           }`}
         >
