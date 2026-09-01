@@ -300,6 +300,146 @@ const searchCode: ToolDef = {
   },
 };
 
+// ── QA: site verification (the agent's automated test suite) ─────────────
+
+export type SiteIssue = { severity: "error" | "warning"; message: string };
+
+/**
+ * Full static-app QA: entry point, link/asset resolution, JS syntax,
+ * and fake-functionality markers. Used by the verify_site tool AND
+ * automatically by the agent loop before a build may finish.
+ */
+export async function verifyProjectFiles(projectId: string): Promise<{ ok: boolean; issues: SiteIssue[] }> {
+  const issues: SiteIssue[] = [];
+  const files = await prisma.projectFile.findMany({
+    where: { projectId, isDir: false },
+    select: { path: true, content: true },
+  });
+  const byPath = new Map(files.map((f) => [f.path, f.content ?? ""]));
+
+  // 1. entry point
+  if (!byPath.has("index.html")) {
+    issues.push({ severity: "error", message: "index.html missing at project root (preview/publish entry)" });
+  }
+
+  // 2. resolve every href/src/target reference in every HTML file
+  const refRe = /(?:href|src)\s*=\s*["']([^"'#]+)["']/gi;
+  for (const [path, html] of byPath) {
+    if (!path.endsWith(".html")) continue;
+    for (const match of html.matchAll(refRe)) {
+      const raw = match[1].trim();
+      if (!raw || /^(https?:|mailto:|tel:|data:|javascript:)/i.test(raw)) continue;
+      const clean = raw.split("?")[0].split("#")[0];
+      if (!clean) continue;
+      const candidates = [
+        clean.replace(/^\.\//, ""),
+        clean.replace(/^\.?\//, "").replace(/\/$/, "/index.html"),
+        path.includes("/") ? path.slice(0, path.lastIndexOf("/") + 1) + clean.replace(/^\.\//, "") : clean,
+      ];
+      if (!candidates.some((c) => byPath.has(c))) {
+        issues.push({ severity: "error", message: `${path}: broken reference "${raw}" — file not written` });
+      }
+    }
+  }
+
+  // 3. JS syntax check (classic scripts — new Function parse)
+  for (const [path, code] of byPath) {
+    if (!/\.(js)$/.test(path) || path.startsWith("node_modules/")) continue;
+    try {
+      // eslint-disable-next-line no-new-func
+      new Function(code);
+    } catch (e) {
+      issues.push({ severity: "error", message: `${path}: JavaScript syntax error — ${e instanceof Error ? e.message.slice(0, 120) : "parse failed"}` });
+    }
+  }
+
+  // 4. fake-functionality markers in the deliverable UI
+  const FAKE = /lorem ipsum|coming soon|placeholder text|TODO: implement|feature not available/i;
+  for (const [path, content] of byPath) {
+    if (path.endsWith(".html") && FAKE.test(content)) {
+      issues.push({ severity: "warning", message: `${path}: contains placeholder/unfinished markers — replace with real content or working behavior` });
+    }
+  }
+
+  // 5. interactivity sanity: an "app" (task/todo/dashboard/manager/store) without
+  //    any JavaScript at all is a mockup, not software.
+  const htmlFiles = [...byPath.entries()].filter(([p]) => p.endsWith(".html"));
+  if (htmlFiles.length === 1 && /task|todo|manage|dashboard|store|shop|app/i.test(htmlFiles[0][0] + (await getProject(projectId))?.name)) {
+    const hasJs = [...byPath.keys()].some((p) => p.endsWith(".js"));
+    const inlineJs = /<script[\s>]/i.test(htmlFiles[0][1]);
+    if (!hasJs && !inlineJs) {
+      issues.push({ severity: "error", message: "interactive app requested but there is NO JavaScript anywhere — buttons/lists would do nothing. Implement real behavior." });
+    }
+  }
+
+  return { ok: !issues.some((i) => i.severity === "error"), issues };
+}
+
+const verifySite: ToolDef = {
+  spec: {
+    type: "function",
+    function: {
+      name: "verify_site",
+      description:
+        "Run the full QA suite on the project: checks index.html entry, resolves every href/src reference, validates JS syntax, and flags fake/unfinished content. ALWAYS run this before claiming a build is done — fix every error it reports.",
+      parameters: { type: "object", properties: {}, additionalProperties: false },
+    },
+  },
+  execute: async (_args, ctx) => {
+    const { ok, issues } = await verifyProjectFiles(ctx.projectId);
+    if (!issues.length) return { ok: true, output: "QA PASSED: entry point OK, all references resolve, JS syntax valid, no fake-content markers." };
+    const report = issues.map((i) => `[${i.severity.toUpperCase()}] ${i.message}`).join("\n");
+    if (ok) return { ok: true, output: `QA PASSED with warnings:\n${report}` };
+    return { ok: false, error: `QA FAILED:\n${report}` };
+  },
+};
+
+// ── sandboxed JS execution (logic tests) ───────────────────────────────────
+
+const runJs: ToolDef = {
+  spec: {
+    type: "function",
+    function: {
+      name: "run_js",
+      description:
+        "Execute a JavaScript snippet in a sandboxed VM (no require/process/network/fs, 2s timeout) and capture console output. Use it to TEST business logic (validation, CRUD functions, calculations) before shipping it into the project.",
+      parameters: {
+        type: "object",
+        properties: { code: { type: "string", description: "JavaScript to execute" } },
+        required: ["code"],
+        additionalProperties: false,
+      },
+    },
+  },
+  execute: async (args) => {
+    const parsed = z.object({ code: z.string().min(1).max(20_000) }).safeParse(args);
+    if (!parsed.success) return { ok: false, error: "code required (≤ 20k chars)" };
+    const vm = await import("node:vm");
+    const logs: string[] = [];
+    const sandbox = {
+      console: {
+        log: (...a: unknown[]) => logs.push(a.map((x) => (typeof x === "object" ? JSON.stringify(x) : String(x))).join(" ")),
+        error: (...a: unknown[]) => logs.push("[err] " + a.map(String).join(" ")),
+      },
+      JSON, Math, Date, Number, String, Boolean, Array, Object, Map, Set, Error,
+      result: undefined as unknown,
+    };
+    try {
+      const script = new vm.Script(parsed.data.code, { filename: "sandbox.js" });
+      const ctx = vm.createContext(sandbox);
+      script.runInContext(ctx, { timeout: 2000 });
+      const out = logs.length ? logs.join("\n") : "(no output)";
+      const res = sandbox.result !== undefined ? `\nresult: ${JSON.stringify(sandbox.result)}` : "";
+      return { ok: true, output: `${out}${res}`.slice(0, 4000) };
+    } catch (e) {
+      return {
+        ok: false,
+        error: `sandbox error: ${e instanceof Error ? `${e.name}: ${e.message}` : "failed"}${logs.length ? `\nlogs:\n${logs.join("\n")}` : ""}`,
+      };
+    }
+  },
+};
+
 const inspectProject: ToolDef = {
   spec: {
     type: "function",
@@ -337,6 +477,8 @@ export const AGENT_TOOLS: ToolDef[] = [
   deleteFile,
   renameFile,
   searchCode,
+  verifySite,
+  runJs,
 ];
 
 export function toolSpecs(): ToolSpec[] {

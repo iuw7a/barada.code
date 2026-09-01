@@ -31,8 +31,8 @@ export async function POST(req: Request) {
     const rl = rateLimit(`chats:create:${user.id}`, 20, 60_000);
     if (!rl.ok) throw new ApiError(429, `太频繁，请 ${rl.retryAfterSec}s 后重试`);
 
-    const parsed = CreateBody.safeParse(await req.json().catch(() => null));
-    if (!parsed.success) throw new ApiError(400, "输入无效");
+    const parsed = CreateBody.safeParse((await req.json().catch(() => ({}))) ?? {});
+    if (!parsed.success) throw new ApiError(400, "Invalid input");
     const { firstMessage, workspaceId, title } = parsed.data;
 
     // Resolve workspace: explicit → user's personal.
@@ -47,15 +47,26 @@ export async function POST(req: Request) {
         if (!m) throw new ApiError(403, "无权访问该工作区");
       }
     } else {
-      const personal = await prisma.workspace.findFirst({
+      let personal = await prisma.workspace.findFirst({
         where: { ownerId: user.id, isPersonal: true },
         select: { id: true },
       });
-      if (!personal) throw new ApiError(500, "个人工作区缺失");
+      // Self-healing: accounts created outside the signup flow (e.g. admins)
+      // get their personal workspace created on first use.
+      if (!personal) {
+        const ws = await prisma.workspace.create({
+          data: { name: "Personal Workspace", isPersonal: true, ownerId: user.id },
+          select: { id: true },
+        });
+        await prisma.workspaceMember.create({
+          data: { workspaceId: ws.id, userId: user.id, role: "OWNER" },
+        });
+        personal = ws;
+      }
       wsId = personal.id;
     }
 
-    const derivedTitle = title ?? (firstMessage ? firstMessage.slice(0, 60) : "新对话");
+    const derivedTitle = title ?? (firstMessage ? firstMessage.slice(0, 60) : "New chat");
 
     const chat = await prisma.chat.create({
       data: {

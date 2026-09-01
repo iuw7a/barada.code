@@ -49,6 +49,12 @@ export async function POST(req: Request) {
     });
 
     await createSession(user.id);
+
+    // Welcome email from hello@iuw7a.com — fire-and-forget, never blocks signup.
+    const { renderTemplate, sendEmail } = await import("@/lib/email");
+    const tpl = renderTemplate("welcome", { name: user.name });
+    sendEmail({ template: "welcome", to: user.email, subject: tpl.subject, html: tpl.html }).catch(() => {});
+
     return NextResponse.json({ user: { id: user.id, email: user.email, name: user.name } }, { status: 201 });
   } catch (err) {
     return apiErrorResponse(err);

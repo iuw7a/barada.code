@@ -70,7 +70,14 @@ export async function POST(req: Request) {
       },
     });
 
-    // TODO: wire transactional email provider; dev-only echo keeps the flow testable.
+    // Send the reset link from the security sender (ai@iuw7a.com).
+    const { renderTemplate, sendEmail } = await import("@/lib/email");
+    const tpl = renderTemplate("password_reset", {
+      name: user.name,
+      url: `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/reset?token=${token}`,
+    });
+    sendEmail({ template: "password_reset", to: user.email, subject: tpl.subject, html: tpl.html }).catch(() => {});
+
     const devEcho = process.env.NODE_ENV !== "production" ? { devToken: token } : {};
     return NextResponse.json({ ok: true, ...devEcho });
   } catch (err) {

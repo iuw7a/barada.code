@@ -14,16 +14,19 @@ const Body = z.object({
 export async function POST(req: Request) {
   try {
     const ip = req.headers.get("x-forwarded-for") ?? "local";
-    const rl = rateLimit(`signin:${ip}`, 10, 60_000);
-    if (!rl.ok) throw new ApiError(429, `太多请求，请 ${rl.retryAfterSec}s 后重试`);
+    const rl = rateLimit(`signin:${ip}`, 20, 60_000);
+    if (!rl.ok) throw new ApiError(429, `Too many attempts — try again in ${rl.retryAfterSec}s`);
 
     const parsed = Body.safeParse(await req.json().catch(() => null));
-    if (!parsed.success) throw new ApiError(400, "输入无效");
+    if (!parsed.success) throw new ApiError(400, "Invalid input");
     const { email, password } = parsed.data;
 
     const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
     if (!user || !verifyPassword(password, user.passwordHash)) {
-      throw new ApiError(401, "邮箱或密码错误");
+      throw new ApiError(401, "Wrong email or password");
+    }
+    if (user.banned) {
+      throw new ApiError(403, "This account has been suspended. Contact support.");
     }
 
     await createSession(user.id);

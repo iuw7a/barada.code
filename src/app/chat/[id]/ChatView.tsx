@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import SponsoredCard from "@/components/SponsoredCard";
 import { useRouter } from "next/navigation";
 import { Send, Wrench, CheckCircle2, XCircle, Loader2, ChevronDown, Copy, Check, Sparkles, Mic, PhoneOff, AudioLines } from "lucide-react";
 import { useVoiceAgent, type ProjectBrief, type VoiceState, type VoiceTurn } from "@/lib/voice/useVoiceAgent";
@@ -474,6 +475,7 @@ export default function ChatView({
             </div>
           </div>
         )}
+        <SponsoredCard />
         <form onSubmit={send} className="glass mx-auto flex max-w-3xl items-end gap-2 rounded-2xl p-2">
           <textarea
             value={input}
