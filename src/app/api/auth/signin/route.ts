@@ -30,7 +30,8 @@ export async function POST(req: Request) {
     }
 
     await createSession(user.id);
-    return NextResponse.json({ user: { id: user.id, email: user.email, name: user.name } });
+    const role = user.role === "ADMIN" || user.role === "SUPER_ADMIN" || user.isAdmin ? (user.role === "USER" ? "ADMIN" : user.role) : "USER";
+    return NextResponse.json({ user: { id: user.id, email: user.email, name: user.name, role } });
   } catch (err) {
     return apiErrorResponse(err);
   }

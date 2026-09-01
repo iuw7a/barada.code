@@ -12,7 +12,14 @@ export async function GET() {
       where: { ownerId: user.id, isPersonal: true },
       select: { id: true, name: true },
     });
-    return NextResponse.json({ user, personalWorkspace: personal });
+    // role is informational for the clients (mobile admin console);
+    // every admin endpoint enforces it server-side via requireAdmin().
+    const row = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { role: true, isAdmin: true },
+    });
+    const role = row?.role === "ADMIN" || row?.role === "SUPER_ADMIN" ? row.role : row?.isAdmin ? "ADMIN" : "USER";
+    return NextResponse.json({ user: { ...user, role }, personalWorkspace: personal });
   } catch (err) {
     return apiErrorResponse(err);
   }

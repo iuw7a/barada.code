@@ -36,7 +36,14 @@ export default function App() {
   useEffect(() => {
     (async () => {
       try { const m = await AsyncStorage.getItem("theme"); if (m) setThemeModeState(m); } catch {}
-      try { const d = await api.me(); if (d.user) setUser(d.user); } catch {}
+      try {
+        const d = await api.me();
+        if (d.user) {
+          setUser(d.user);
+          // Admins land straight in the Admin Console — this is the ADMIN app experience.
+          if (d.user.role === "ADMIN" || d.user.role === "SUPER_ADMIN") setAdminOpen(true);
+        }
+      } catch {}
       setBooting(false);
     })();
   }, []);
@@ -63,7 +70,7 @@ export default function App() {
       {home && (
         <ChatHome t={t} user={user} openChatId={openChatId} onChatOpened={() => setOpenChatId(null)}
           onOpenDrawer={() => setDrawer(true)}
-          onSignedIn={(u) => { setUser(u); setDrawerAuth(false); }} />
+          onSignedIn={(u) => { setUser(u); setDrawerAuth(false); if (u?.role === "ADMIN" || u?.role === "SUPER_ADMIN") setAdminOpen(true); }} />
       )}
 
       {/* ── secondary screens ── */}
@@ -97,7 +104,7 @@ export default function App() {
 
       {/* auth from the drawer */}
       <AuthPrompt visible={drawerAuth} t={t} onClose={() => setDrawerAuth(false)}
-        onSignedIn={(u) => { setUser(u); setDrawerAuth(false); }} />
+        onSignedIn={(u) => { setUser(u); setDrawerAuth(false); if (u?.role === "ADMIN" || u?.role === "SUPER_ADMIN") setAdminOpen(true); }} />
 
       {/* ── ADMIN CONSOLE (fullscreen, role-checked server-side) ── */}
       {adminOpen && (
