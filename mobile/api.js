@@ -1,6 +1,8 @@
 /** Barada mobile — API layer over the shared backend. */
 
-export const API = "http://192.168.0.134:3000";
+/** Production backend — reachable from mobile data AND home WiFi. */
+export const API = "https://barada-code.vercel.app";
+/** Local dev fallback: export const API = "http://192.168.0.134:3000"; */
 
 /** fetch with a hard timeout — a dead server must surface as an error, never an infinite spinner. */
 export function apiFetch(url, opts = {}) {
@@ -43,4 +45,13 @@ export const api = {
 
   guestChat: (message, history) =>
     apiFetch(`/api/guest/chat`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message, history }) }).then(json),
+
+  // ── Admin console (server-side role checks — the app only hides, never protects) ──
+  adminStats: () => apiFetch(`/api/admin/stats`).then(json),
+  adminHealth: () => apiFetch(`/api/admin/health`).then(json),
+  adminSeries: (days = 14) => apiFetch(`/api/admin/series?days=${days}`).then(json),
+  adminUsers: (q = "", filter = "all", page = 1) =>
+    apiFetch(`/api/admin/users?q=${encodeURIComponent(q)}&filter=${filter}&page=${page}&pageSize=25`).then(json),
+  adminPatchUser: (id, body) =>
+    apiFetch(`/api/admin/users/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(json),
 };

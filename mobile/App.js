@@ -15,6 +15,7 @@ import { palette } from "./theme";
 import Drawer from "./Drawer";
 import { AuthPrompt, AuthForm } from "./Auth";
 import { ChatsScreen, ProjectsScreen, UsageScreen, SettingsScreen, AboutScreen, HelpScreen, LegalScreen } from "./screens";
+import AdminApp from "./Admin";
 
 const GUEST_LIMIT = 1; // free AI exchanges before the auth wall
 const SUGGESTIONS = ["Build me a website", "Create a landing page for my shop", "Make a personal portfolio", "Help me plan an app"];
@@ -30,6 +31,7 @@ export default function App() {
   const [drawerAuth, setDrawerAuth] = useState(false);
   const [screen, setScreen] = useState(null); // null = chat home; 'chats'|'projects'|'usage'|'settings'|'about'|'help'|'terms'|'privacy'
   const [openChatId, setOpenChatId] = useState(null);
+  const [adminOpen, setAdminOpen] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -90,11 +92,20 @@ export default function App() {
           else if (dest === "chats") { if (user) setScreen("chats"); else setDrawerAuth(true); }
           else setScreen(dest);
         }}
-        onAuthAction={(a) => { setDrawer(false); if (a === "signin") setDrawerAuth(true); }} />
+        onAuthAction={(a) => { setDrawer(false); if (a === "signin") setDrawerAuth(true); }}
+        onAdmin={() => { setDrawer(false); setAdminOpen(true); }} />
 
       {/* auth from the drawer */}
       <AuthPrompt visible={drawerAuth} t={t} onClose={() => setDrawerAuth(false)}
         onSignedIn={(u) => { setUser(u); setDrawerAuth(false); }} />
+
+      {/* ── ADMIN CONSOLE (fullscreen, role-checked server-side) ── */}
+      {adminOpen && (
+        <AdminApp
+          onExit={() => setAdminOpen(false)}
+          onLogout={() => { setUser(null); setAdminOpen(false); setScreen(null); }}
+        />
+      )}
     </SafeAreaView>
   );
 }

@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 
 const W = 310;
 
-export default function Drawer({ visible, onClose, t, user, onNavigate, onAuthAction, themeMode, setThemeMode }) {
+export default function Drawer({ visible, onClose, t, user, onNavigate, onAuthAction, themeMode, setThemeMode, onAdmin }) {
   const slide = useRef(new Animated.Value(-W)).current;
   const fade = useRef(new Animated.Value(0)).current;
 
@@ -54,6 +54,7 @@ export default function Drawer({ visible, onClose, t, user, onNavigate, onAuthAc
             <Item icon="✚" label="New chat" onPress={() => onNavigate("newchat")} />
             <Item icon="🕘" label="History" onPress={() => onNavigate("chats")} />
             <Item icon="📦" label="Projects" onPress={() => onNavigate("projects")} />
+            <Item icon="🛡️" label="Admin Console" tint={t.accent} onPress={() => onAdmin?.()} />
           </Section>
 
           <Section title="ACCOUNT">
