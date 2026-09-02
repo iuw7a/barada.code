@@ -90,7 +90,7 @@ export default function AdminShell({ children, adminName, role }: { children: Re
       <div className="flex h-full flex-col border-r border-white/5">
         {/* brand */}
         <Link href="/admin" className="flex items-center gap-3 px-4 py-5" onClick={() => setMobileOpen(false)}>
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-emerald-500/10 text-lg text-emerald-400 ring-1 ring-emerald-500/30 shadow-[0_0_18px_rgba(16,185,129,0.25)]">◆</span>
+          <img src="/barada-logo.png" alt="Barada Code" className="h-9 w-9 rounded-xl bg-emerald-500/10 object-contain p-1 ring-1 ring-emerald-500/30 shadow-[0_0_18px_rgba(16,185,129,0.25)]" />
           {!collapsed && (
             <span>
               <span className="block text-[13px] font-bold tracking-wide text-zinc-100">BARADA</span>
