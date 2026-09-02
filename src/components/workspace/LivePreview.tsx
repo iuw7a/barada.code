@@ -9,8 +9,8 @@ type ProcState = {
 
 /**
  * Live Browser panel — shows the ACTUAL running dev server through the
- * authenticated /live proxy. Server state (Starting/Running/Stopped) comes
- * from /processes. Includes restart + device-size switching.
+ * authenticated /live proxy. Server state (Running/Stopped/Starting) comes
+ * from /processes; while booting, the proxy serves an auto-retrying page.
  */
 export default function LivePreview({ projectId }: { projectId: string }) {
   const [iframeNonce, setIframeNonce] = useState(0);
@@ -28,11 +28,15 @@ export default function LivePreview({ projectId }: { projectId: string }) {
       if (!res.ok) return;
       const data: ProcState = await res.json();
       const running = data.processes.some((p) => p.status === "RUNNING" && p.port);
-      setServerState(running ? "RUNNING" : "STOPPED");
+      setServerState((prev) => {
+        // Don't downgrade STARTING → STOPPED during the first seconds of boot.
+        if (prev === "STARTING" && !running && starting) return "STARTING";
+        return running ? "RUNNING" : prev === "STARTING" ? "STOPPED" : "STOPPED";
+      });
     } catch {
       /* keep last state */
     }
-  }, [projectId]);
+  }, [projectId, starting]);
 
   useEffect(() => {
     void pollProcesses();
@@ -92,13 +96,14 @@ export default function LivePreview({ projectId }: { projectId: string }) {
         });
       }
       setServerState("STOPPED");
+      refresh();
     } catch {
       /* best effort */
     }
   }
 
   const deviceWidth = device === "desktop" ? "100%" : device === "tablet" ? "768px" : "390px";
-  const running = serverState === "RUNNING";
+  const showIframe = serverState === "RUNNING" || serverState === "STARTING";
 
   return (
     <div className="flex h-full flex-col">
@@ -107,7 +112,7 @@ export default function LivePreview({ projectId }: { projectId: string }) {
         <div className="flex items-center gap-2">
           <span
             className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium ${
-              running
+              serverState === "RUNNING"
                 ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
                 : serverState === "STARTING"
                   ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
@@ -131,7 +136,7 @@ export default function LivePreview({ projectId }: { projectId: string }) {
             </button>
           ))}
           <span className="mx-1 h-4 w-px bg-ink-200 dark:bg-ink-700" />
-          {!running ? (
+          {serverState !== "RUNNING" ? (
             <button onClick={startServer} disabled={starting} className="btn-ghost p-1.5" title="Start dev server" aria-label="Start server">
               {starting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
             </button>
@@ -147,7 +152,7 @@ export default function LivePreview({ projectId }: { projectId: string }) {
             href={`/api/projects/${projectId}/live/`}
             target="_blank"
             rel="noreferrer"
-            className={`btn-ghost p-1.5 ${!running ? "pointer-events-none opacity-40" : ""}`}
+            className={`btn-ghost p-1.5 ${serverState !== "RUNNING" ? "pointer-events-none opacity-40" : ""}`}
             title="Open in new tab"
             aria-label="Open in new tab"
           >
@@ -158,7 +163,7 @@ export default function LivePreview({ projectId }: { projectId: string }) {
 
       {/* Frame */}
       <div className="min-h-0 flex-1 overflow-auto bg-ink-50 p-2 dark:bg-ink-950">
-        {running ? (
+        {showIframe ? (
           <div className="mx-auto h-full bg-white shadow-sm dark:bg-white" style={{ width: deviceWidth, maxWidth: "100%" }}>
             <iframe
               key={iframeNonce}
