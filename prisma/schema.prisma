@@ -28,9 +28,9 @@ model User {
   updatedAt    DateTime @updatedAt
 
   settings        UserSettings?
-  ownedWorkspaces Workspace[]   @relation("WorkspaceOwner")
+  ownedWorkspaces Workspace[]       @relation("WorkspaceOwner")
   memberships     WorkspaceMember[]
-  projects        Project[]     @relation("ProjectOwner")
+  projects        Project[]         @relation("ProjectOwner")
   chats           Chat[]
   messages        Message[]
   aiJobs          AIJob[]
@@ -55,13 +55,13 @@ model Session {
 }
 
 model PasswordReset {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash String   @unique
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   @@index([userId])
 }
@@ -69,54 +69,54 @@ model PasswordReset {
 // ── Workspaces & members ───────────────────────────────────────────────────
 
 model Workspace {
-  id        String   @id @default(cuid())
-  name      String
-  isPersonal Boolean @default(false)
-  ownerId   String
-  owner     User     @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String   @id @default(cuid())
+  name       String
+  isPersonal Boolean  @default(false)
+  ownerId    String
+  owner      User     @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  members   WorkspaceMember[]
-  projects  Project[]
-  chats     Chat[]
-  settings  WorkspaceSettings?
-  invites   Invite[]
+  members  WorkspaceMember[]
+  projects Project[]
+  chats    Chat[]
+  settings WorkspaceSettings?
+  invites  Invite[]
 
   @@index([ownerId])
 }
 
 // Owner / Admin / Member / Viewer
 model WorkspaceMember {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   workspaceId String
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role        String   @default("MEMBER") // OWNER | ADMIN | MEMBER | VIEWER
-  createdAt   DateTime @default(now())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role        String    @default("MEMBER") // OWNER | ADMIN | MEMBER | VIEWER
+  createdAt   DateTime  @default(now())
 
   @@unique([workspaceId, userId])
   @@index([userId])
 }
 
 model WorkspaceSettings {
-  id          String @id @default(cuid())
-  workspaceId String @unique
+  id          String    @id @default(cuid())
+  workspaceId String    @unique
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  json        Json   @default("{}")
+  json        Json      @default("{}")
 }
 
 model Invite {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   workspaceId String
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   email       String
-  role        String   @default("MEMBER")
-  tokenHash   String   @unique
+  role        String    @default("MEMBER")
+  tokenHash   String    @unique
   expiresAt   DateTime
   acceptedAt  DateTime?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
 
   @@index([workspaceId])
 }
@@ -124,28 +124,136 @@ model Invite {
 // ── Projects & files ───────────────────────────────────────────────────────
 
 model Project {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   name        String
   description String?
   workspaceId String
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   ownerId     String
-  owner       User     @relation("ProjectOwner", fields: [ownerId], references: [id])
-  status      String   @default("ACTIVE") // ACTIVE | ARCHIVED | DELETED
+  owner       User      @relation("ProjectOwner", fields: [ownerId], references: [id])
+  status      String    @default("ACTIVE") // ACTIVE | ARCHIVED | DELETED
   framework   String?
   language    String?
-  visibility  String   @default("PRIVATE") // PRIVATE | WORKSPACE | PUBLIC
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  visibility  String    @default("PRIVATE") // PRIVATE | WORKSPACE | PUBLIC
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  files     ProjectFile[]
-  chats     Chat[]
-  aiJobs    AIJob[]
-  settings  ProjectSettings?
-  deployment Deployment?
+  files        ProjectFile[]
+  chats        Chat[]
+  aiJobs       AIJob[]
+  settings     ProjectSettings?
+  deployment   Deployment?
+  checkpoints  Checkpoint[]
+  changes      FileChange[]
+  processes    ProjectProcess[]
+  envVars      ProjectEnvVar[]
+  deployments  DeploymentHistory[]
+  terminalLogs TerminalLog[]
 
   @@index([workspaceId])
   @@index([ownerId])
+}
+
+// ── Real execution environment (sandbox engine) ───────────────────────────
+
+/// A saved snapshot of the project's durable files. Created before major
+/// agent operations; restoring copies rows back. Content stored inline —
+/// projects are text-code sized.
+model Checkpoint {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  label     String
+  fileCount Int      @default(0)
+  payload   Json // [{ path, isDir, content }]
+  createdAt DateTime @default(now())
+
+  @@index([projectId, createdAt])
+}
+
+/// Every file create/modify/delete/rename the agent performs — powers the
+/// "Changed Files" panel and gives the UI a per-build diff feed.
+model FileChange {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  path      String
+  kind      String // created | modified | deleted | renamed
+  fromPath  String? // for renames
+  agentRun  String? // groups changes per build/turn
+  createdAt DateTime @default(now())
+
+  @@index([projectId, createdAt])
+  @@index([projectId, agentRun])
+}
+
+/// A process started in the project sandbox (dev server, build, test run).
+/// Durable record so the UI can list, stop and restart after page reloads.
+model ProjectProcess {
+  id        String    @id @default(cuid())
+  projectId String
+  project   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name      String // e.g. "dev", "build", "test"
+  command   String    @db.Text
+  status    String    @default("RUNNING") // RUNNING | EXITED | FAILED | STOPPED
+  exitCode  Int?
+  port      Int? // for servers — the live preview proxy target
+  pid       Int? // sandbox OS pid when provider supports it
+  startedBy String // userId
+  startedAt DateTime  @default(now())
+  endedAt   DateTime?
+
+  @@index([projectId, status])
+}
+
+/// Project-scoped environment variables. Secret values are stored encrypted
+/// (secretBox) and are NEVER returned to the client or the AI — only the
+/// masked presence is exposed.
+model ProjectEnvVar {
+  id         String   @id @default(cuid())
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  key        String
+  valueEnc   String?  @db.Text // encrypted when secret
+  valuePlain String? // for non-secret vars
+  isSecret   Boolean  @default(false)
+  target     String   @default("all") // all | development | production
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([projectId, key])
+}
+
+/// Immutable deployment history with build info + health-check result.
+model DeploymentHistory {
+  id           String      @id @default(cuid())
+  projectId    String
+  project      Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  subdomain    String
+  status       String      @default("BUILDING") // BUILDING | VERIFYING | LIVE | FAILED | ROLLED_BACK
+  commitLabel  String?
+  buildLog     String?     @db.Text
+  healthOk     Boolean?
+  createdAt    DateTime    @default(now())
+  Deployment   Deployment? @relation(fields: [deploymentId], references: [id])
+  deploymentId String?
+
+  @@index([projectId, createdAt])
+}
+
+/// Terminal output captured from sandbox command execution (audit + UI).
+model TerminalLog {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  processId String?
+  command   String   @db.Text
+  output    String   @db.Text
+  exitCode  Int?
+  kind      String   @default("exec") // exec | process
+  createdAt DateTime @default(now())
+
+  @@index([projectId, createdAt])
 }
 
 // Published site: one per project. Served at {subdomain}.{ROOT_DOMAIN}
@@ -162,6 +270,8 @@ model Deployment {
   lastDeployedAt   DateTime  @default(now())
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
+
+  history DeploymentHistory[]
 
   @@index([subdomain])
 }
@@ -182,28 +292,28 @@ model ProjectFile {
 }
 
 model ProjectSettings {
-  id        String @id @default(cuid())
-  projectId String @unique
+  id        String  @id @default(cuid())
+  projectId String  @unique
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  json      Json   @default("{}")
+  json      Json    @default("{}")
 }
 
 // ── Chats & messages ───────────────────────────────────────────────────────
 
 model Chat {
-  id          String   @id @default(cuid())
-  title       String   @default("新对话")
+  id          String    @id @default(cuid())
+  title       String    @default("新对话")
   userId      String
-  user        User     @relation(fields: [userId], references: [id])
+  user        User      @relation(fields: [userId], references: [id])
   workspaceId String
   workspace   Workspace @relation(fields: [workspaceId], references: [id])
   projectId   String?
-  project     Project? @relation(fields: [projectId], references: [id])
+  project     Project?  @relation(fields: [projectId], references: [id])
   model       String?
-  status      String   @default("IDLE") // IDLE | GENERATING | ERROR
-  metadata    Json     @default("{}")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  status      String    @default("IDLE") // IDLE | GENERATING | ERROR
+  metadata    Json      @default("{}")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   messages Message[]
   aiJobs   AIJob[]
@@ -228,24 +338,38 @@ model Message {
   @@index([chatId])
 }
 
+/// Inbound contact-form submissions (real storage, admin Email Center reads it).
+model ContactMessage {
+  id        String   @id @default(cuid())
+  userId    String?
+  name      String
+  email     String
+  subject   String
+  message   String   @db.Text
+  handled   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
 // ── AI jobs ────────────────────────────────────────────────────────────────
 
 model AIJob {
-  id             String    @id @default(cuid())
-  userId         String
-  user           User      @relation(fields: [userId], references: [id])
-  chatId         String?
-  chat           Chat?     @relation(fields: [chatId], references: [id])
-  projectId      String?
-  project        Project?  @relation(fields: [projectId], references: [id])
-  model          String?
-  status         String    @default("PENDING") // PENDING | RUNNING | COMPLETED | FAILED | CANCELLED
-  error          String?   @db.Text
-  promptTokens   Int?
+  id               String    @id @default(cuid())
+  userId           String
+  user             User      @relation(fields: [userId], references: [id])
+  chatId           String?
+  chat             Chat?     @relation(fields: [chatId], references: [id])
+  projectId        String?
+  project          Project?  @relation(fields: [projectId], references: [id])
+  model            String?
+  status           String    @default("PENDING") // PENDING | RUNNING | COMPLETED | FAILED | CANCELLED
+  error            String?   @db.Text
+  promptTokens     Int?
   completionTokens Int?
-  startedAt      DateTime?
-  completedAt    DateTime?
-  createdAt      DateTime  @default(now())
+  startedAt        DateTime?
+  completedAt      DateTime?
+  createdAt        DateTime  @default(now())
 
   @@index([userId])
   @@index([chatId])
@@ -256,44 +380,44 @@ model AIJob {
 // ── Library / Integrations / Notifications ─────────────────────────────────
 
 model Asset {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  name      String
-  kind      String   @default("OTHER") // IMAGE | DOC | TEMPLATE | COMPONENT | OTHER
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  name       String
+  kind       String   @default("OTHER") // IMAGE | DOC | TEMPLATE | COMPONENT | OTHER
   storageKey String
-  size      Int      @default(0)
-  meta      Json     @default("{}")
-  createdAt DateTime @default(now())
+  size       Int      @default(0)
+  meta       Json     @default("{}")
+  createdAt  DateTime @default(now())
 
   @@index([userId])
 }
 
 model Integration {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  provider  String // GITHUB | GITLAB | VERCEL | ...
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  provider   String // GITHUB | GITLAB | VERCEL | ...
   // Encrypted credential blob (AES-256-GCM, key from INTEGRATION_ENC_KEY).
   // Never store plaintext credentials.
-  credential String? @db.Text
-  status    String   @default("DISCONNECTED") // DISCONNECTED | CONNECTED | ERROR
-  meta      Json     @default("{}")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  credential String?  @db.Text
+  status     String   @default("DISCONNECTED") // DISCONNECTED | CONNECTED | ERROR
+  meta       Json     @default("{}")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   @@unique([userId, provider])
 }
 
 model Notification {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  kind      String   @default("SYSTEM") // SYSTEM | PROJECT | AI | WORKSPACE
+  user      User      @relation(fields: [userId], references: [id])
+  kind      String    @default("SYSTEM") // SYSTEM | PROJECT | AI | WORKSPACE
   title     String
-  body      String?  @db.Text
+  body      String?   @db.Text
   readAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   @@index([userId])
 }
@@ -309,22 +433,23 @@ model UserSettings {
 }
 
 model Usage {
-  id        String   @id @default(cuid())
-  userId    String
-  month     String // YYYY-MM
-  aiCalls   Int      @default(0)
-  aiTokens  Int      @default(0)
+  id       String @id @default(cuid())
+  userId   String
+  month    String // YYYY-MM
+  aiCalls  Int    @default(0)
+  aiTokens Int    @default(0)
+
   @@unique([userId, month])
 }
 
 model Subscription {
-  id        String    @id @default(cuid())
-  userId    String
-  user      User      @relation(fields: [userId], references: [id])
-  plan      String    @default("FREE") // FREE | PRO | TEAM
-  status    String    @default("ACTIVE") // ACTIVE | CANCELLED | PAST_DUE
+  id               String    @id @default(cuid())
+  userId           String
+  user             User      @relation(fields: [userId], references: [id])
+  plan             String    @default("FREE") // FREE | PRO | TEAM
+  status           String    @default("ACTIVE") // ACTIVE | CANCELLED | PAST_DUE
   currentPeriodEnd DateTime?
-  createdAt DateTime  @default(now())
+  createdAt        DateTime  @default(now())
 
   @@index([userId])
 }
@@ -394,9 +519,9 @@ model AdEvent {
   id        String   @id @default(cuid())
   adId      String
   ad        Ad       @relation(fields: [adId], references: [id], onDelete: Cascade)
-  type      String   // IMPRESSION | CLICK
+  type      String // IMPRESSION | CLICK
   userId    String?
-  day       String   // YYYY-MM-DD for cheap daily aggregation
+  day       String // YYYY-MM-DD for cheap daily aggregation
   createdAt DateTime @default(now())
 
   @@index([adId])

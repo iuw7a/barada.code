@@ -3,7 +3,14 @@ import { getSessionUser } from "@/lib/auth/session";
 import { redirect } from "next/navigation";
 import IntegrationsClient from "./IntegrationsClient";
 
-const PROVIDERS = ["GITHUB", "GITLAB", "VERCEL", "DATABASE", "CUSTOM_API"] as const;
+/**
+ * Integrations: only providers with REAL implemented behavior are listed.
+ * GitHub/Vercel/etc. connections were advertised but never functional —
+ * they are hidden until a real implementation ships.
+ * DATA connection = external databases for generated projects (real, stored
+ * encrypted and injected into the sandbox at run time).
+ */
+const PROVIDERS = ["DATA"] as const;
 
 export default async function IntegrationsPage() {
   const user = await getSessionUser();

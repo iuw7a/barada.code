@@ -28,6 +28,8 @@ export interface ChatProvider {
     messages: ChatMessage[];
     tools?: ToolSpec[];
     signal?: AbortSignal;
+    /** Receives token usage when the provider reports it (final chunk). */
+    onUsage?: (usage: { prompt_tokens?: number; completion_tokens?: number }) => void;
   }): AsyncGenerator<
     | { type: "delta"; text: string }
     | { type: "tool_calls"; toolCalls: Array<{ id: string; name: string; arguments: string }> }
@@ -46,6 +48,7 @@ export class OpenAICompatibleProvider implements ChatProvider {
     messages: ChatMessage[];
     tools?: ToolSpec[];
     signal?: AbortSignal;
+    onUsage?: (usage: { prompt_tokens?: number; completion_tokens?: number }) => void;
   }): AsyncGenerator<
     | { type: "delta"; text: string }
     | { type: "tool_calls"; toolCalls: Array<{ id: string; name: string; arguments: string }> }
@@ -118,6 +121,9 @@ export class OpenAICompatibleProvider implements ChatProvider {
         const choice = json.choices?.[0];
         if (!choice) continue;
         if (choice.finish_reason) finishReason = choice.finish_reason;
+        if (json.usage && opts.onUsage) {
+          opts.onUsage({ prompt_tokens: json.usage.prompt_tokens, completion_tokens: json.usage.completion_tokens });
+        }
         const delta = choice.delta;
         if (delta?.content) yield { type: "delta", text: delta.content };
         if (delta?.tool_calls) {

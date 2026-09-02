@@ -25,3 +25,7 @@ coverage/
 
 # prisma
 prisma/migrations/dev/
+
+.vercel
+.env*
+.sandboxes/

@@ -1,24 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import { Github, GitBranch, Triangle, Database, Globe, CheckCircle2, XCircle } from "lucide-react";
+import { Database, Globe, CheckCircle2, XCircle } from "lucide-react";
 
 type Integration = { provider: string; status: string; meta: Record<string, string> };
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  GITHUB: Github,
-  GITLAB: GitBranch,
-  VERCEL: Triangle,
-  DATABASE: Database,
-  CUSTOM_API: Globe,
+  DATA: Database,
 };
 
 const LABELS: Record<string, string> = {
-  GITHUB: "GitHub",
-  GITLAB: "GitLab",
-  VERCEL: "Vercel",
-  DATABASE: "Database",
-  CUSTOM_API: "Custom API",
+  DATA: "External Database",
+};
+
+const DESCRIPTIONS: Record<string, string> = {
+  DATA:
+    "Connect your own PostgreSQL/MySQL database for generated projects. The connection string is stored encrypted and injected into your project's sandbox as DATABASE_URL at run time — never into your source code.",
 };
 
 export default function IntegrationsClient({ integrations }: { integrations: Integration[] }) {
@@ -69,7 +66,7 @@ export default function IntegrationsClient({ integrations }: { integrations: Int
     <div className="mx-auto max-w-4xl px-6 py-10">
       <h1 className="mb-2 text-2xl font-semibold">Integrations</h1>
       <p className="mb-8 text-sm text-ink-500">
-        Connect external services. Credentials are encrypted at rest and never displayed again.
+        Only genuinely implemented integrations are shown. Credentials are encrypted at rest and never displayed again.
       </p>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -93,13 +90,14 @@ export default function IntegrationsClient({ integrations }: { integrations: Int
                   </span>
                 )}
               </div>
+              <p className="mt-2 text-xs text-ink-500 dark:text-ink-400">{DESCRIPTIONS[integration.provider]}</p>
 
               {connecting === integration.provider ? (
                 <div className="mt-4 flex flex-col gap-2">
                   <input
                     type="password"
                     className="input"
-                    placeholder="API token / credential"
+                    placeholder="postgresql://user:pass@host:5432/db"
                     value={credential}
                     onChange={(e) => setCredential(e.target.value)}
                     autoFocus
