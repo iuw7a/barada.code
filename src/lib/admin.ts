@@ -28,6 +28,45 @@ export async function requireAdmin(): Promise<AdminSession> {
   return admin;
 }
 
+// ── Permission system (enforced server-side — the UI only hides, never protects) ─
+
+/** The built-in ADMIN fallback permission set (used when no custom role is attached). */
+export const DEFAULT_ADMIN_PERMS = [
+  "users.view", "users.suspend", "users.pro", "users.sessions", "users.resetUsage",
+  "projects.view", "projects.delete", "ai.view", "ai.manage", "analytics.view",
+  "messages.view", "system.view", "security.view", "security.logs", "settings.manage",
+  "roles.view", "audit.view", "api.view",
+];
+
+export type AdminPerms = { role: Role; roleName: string; perms: string[]; isSuper: boolean };
+
+/** Resolves the signed-in admin's effective permissions from their custom role. */
+export async function getPerms(): Promise<AdminPerms | null> {
+  const admin = await getAdmin();
+  if (!admin) return null;
+  if (admin.role === "SUPER_ADMIN") {
+    return { role: "SUPER_ADMIN", roleName: "Super Admin", perms: ["*"], isSuper: true };
+  }
+  const row = await prisma.user.findUnique({
+    where: { id: admin.id },
+    select: { customRole: { select: { name: true, permissions: true } } },
+  });
+  const perms = (row?.customRole?.permissions as string[] | undefined) ?? DEFAULT_ADMIN_PERMS;
+  return { role: "ADMIN", roleName: row?.customRole?.name ?? "Admin", perms, isSuper: false };
+}
+
+function has(perms: string[], perm: string) {
+  return perms.includes("*") || perms.includes(perm);
+}
+
+/** Throws 404 unless the signed-in admin holds `perm` — real server-side RBAC. */
+export async function requirePerm(perm: string): Promise<AdminSession> {
+  const admin = await requireAdmin();
+  const p = await getPerms();
+  if (!p || !has(p.perms, perm)) throw new ApiError(404, "Not found");
+  return admin;
+}
+
 export async function requireSuperAdmin(): Promise<AdminSession> {
   const admin = await requireAdmin();
   if (admin.role !== "SUPER_ADMIN") throw new ApiError(404, "Not found");

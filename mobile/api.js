@@ -27,6 +27,7 @@ export const api = {
     apiFetch(`/api/auth/signin`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password }) }).then(json),
   signup: (email, password, name) =>
     apiFetch(`/api/auth/signup`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password, name }) }).then(json),
+  signout: () => apiFetch(`/api/auth/signout`, { method: "POST" }).then(json),
 
   chats: () => apiFetch(`/api/chats`).then(json),
   createChat: () => apiFetch(`/api/chats`, { method: "POST" }).then(json),
@@ -54,4 +55,13 @@ export const api = {
     apiFetch(`/api/admin/users?q=${encodeURIComponent(q)}&filter=${filter}&page=${page}&pageSize=25`).then(json),
   adminPatchUser: (id, body) =>
     apiFetch(`/api/admin/users/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(json),
+  adminDeleteUser: (id) => apiFetch(`/api/admin/users/${id}`, { method: "DELETE" }).then(json),
+  adminAudit: (page = 1) => apiFetch(`/api/admin/audit?page=${page}`).then(json),
+  adminProjects: (q = "", page = 1) => apiFetch(`/api/admin/projects?q=${encodeURIComponent(q)}&page=${page}`).then(json),
+  adminRoles: () => apiFetch(`/api/admin/roles`).then(json),
+  adminCreateRole: (name, description, permissions) =>
+    apiFetch(`/api/admin/roles`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, description, permissions }) }).then(json),
+  adminUpdateRole: (id, body) =>
+    apiFetch(`/api/admin/roles/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(json),
+  adminDeleteRole: (id) => apiFetch(`/api/admin/roles/${id}`, { method: "DELETE" }).then(json),
 };

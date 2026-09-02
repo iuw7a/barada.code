@@ -21,6 +21,8 @@ model User {
   avatarUrl    String?
   isAdmin      Boolean  @default(false)
   role         String   @default("USER") // USER | ADMIN | SUPER_ADMIN
+  roleId       String?
+  customRole   Role?    @relation(fields: [roleId], references: [id])
   banned       Boolean  @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -411,4 +413,19 @@ model AuditLog {
   createdAt DateTime @default(now())
 
   @@index([userId])
+  @@index([createdAt])
+}
+
+/// Custom RBAC roles. Effective permissions = permissions JSON (array of strings).
+/// The wildcard "*" grants everything. Built-in system roles are seeded and undeletable.
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String   @default("")
+  permissions Json     @default("[]")
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users User[]
 }

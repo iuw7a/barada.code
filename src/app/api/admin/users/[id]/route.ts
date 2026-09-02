@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin, requireSuperAdmin, audit } from "@/lib/admin";
+import { requireAdmin, requirePerm, requireSuperAdmin, audit, getPerms } from "@/lib/admin";
 import { apiErrorResponse, ApiError } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +10,7 @@ const PatchBody = z.object({
   plan: z.enum(["FREE", "PRO", "TEAM"]).optional(),
   banned: z.boolean().optional(),
   role: z.enum(["USER", "ADMIN", "SUPER_ADMIN"]).optional(),
+  roleId: z.string().optional(),
   resetUsage: z.boolean().optional(),
   revokeSessions: z.boolean().optional(),
 });
@@ -29,6 +30,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       where: { id },
       select: {
         id: true, email: true, name: true, avatarUrl: true, role: true, banned: true, createdAt: true,
+        customRole: { select: { name: true, permissions: true } },
         _count: { select: { projects: true, chats: true, messages: true, sessions: true } },
         subscriptions: { orderBy: { createdAt: "desc" }, select: { id: true, plan: true, status: true, createdAt: true, currentPeriodEnd: true } },
         sessions: { orderBy: { createdAt: "desc" }, take: 5, select: { createdAt: true, expiresAt: true } },
@@ -42,6 +44,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({
       user: {
         id: u.id, email: u.email, name: u.name, avatarUrl: u.avatarUrl, role: u.role, banned: u.banned,
+        customRole: u.customRole?.name ?? null,
         createdAt: u.createdAt,
         counts: { projects: u._count.projects, chats: u._count.chats, messages: u._count.messages, sessions: u._count.sessions },
         plan: u.subscriptions.find((s) => s.status === "ACTIVE")?.plan ?? "FREE",
@@ -64,10 +67,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const target = await targetOr404(id);
     const parsed = PatchBody.safeParse(await req.json().catch(() => null));
     if (!parsed.success) throw new ApiError(400, "Invalid input");
-    const { plan, banned, role, resetUsage, revokeSessions } = parsed.data;
+    const { plan, banned, role, roleId, resetUsage, revokeSessions } = parsed.data;
+
+    // Real server-side RBAC — each action requires its own permission.
+    if (plan) await requirePerm("users.pro");
+    if (banned !== undefined) await requirePerm("users.suspend");
+    if (revokeSessions) await requirePerm("users.sessions");
+    if (resetUsage) await requirePerm("users.resetUsage");
 
     if ((banned === true) && target.id === admin.id) throw new ApiError(400, "You cannot suspend your own account");
-    if (role && admin.role !== "SUPER_ADMIN") throw new ApiError(403, "Only SUPER_ADMIN can change roles");
+    if ((role || roleId) && admin.role !== "SUPER_ADMIN") throw new ApiError(403, "Only SUPER_ADMIN can change roles");
     if (role && target.id === admin.id && role !== "SUPER_ADMIN") throw new ApiError(400, "You cannot demote your own account");
 
     if (plan) {
@@ -90,6 +99,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (role) {
       await prisma.user.update({ where: { id }, data: { role, isAdmin: role !== "USER" } });
       await audit(admin.id, "user.role_changed", target.email, { role });
+    }
+
+    if (roleId) {
+      const r = await prisma.role.findUnique({ where: { id: roleId } });
+      if (!r) throw new ApiError(400, "Role not found");
+      await prisma.user.update({ where: { id }, data: { roleId } });
+      await audit(admin.id, "user.custom_role_assigned", target.email, { role: r.name });
     }
 
     if (revokeSessions) {
